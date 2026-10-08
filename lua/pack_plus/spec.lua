@@ -63,11 +63,36 @@ local function expand_dir(dir)
 	return (vim.fn.expand(dir):gsub('/+$', ''))
 end
 
---- A table is a spec when it names a source. Otherwise it is a list of specs.
+--- Whether a table's keys are exactly `1..n`. Copied from lazy.nvim
+--- (`lazy/core/util.lua`, `Util.is_list`).
+--- @param t table
+--- @return boolean
+local function is_list(t)
+	local i = 0
+	for _ in pairs(t) do
+		i = i + 1
+		if t[i] == nil then
+			return false
+		end
+	end
+	return true
+end
+
+--- Lazy's rule: a table holding anything but list entries, and at most one of
+--- those, is a single spec. So `{ 'owner/repo', opts = {} }` is one spec while
+--- `{ 'owner/repo', 'other/repo' }` is two, and the braces around a lone spec
+--- stay optional. `src`/`dir` settle it outright, since such a spec need not
+--- carry a list entry at all.
 --- @param t any
 --- @return boolean
 local function is_spec(t)
-	return type(t) == 'table' and (type(t[1]) == 'string' or t.src ~= nil or t.dir ~= nil)
+	if type(t) ~= 'table' or t.import ~= nil then
+		return false
+	end
+	if t.src ~= nil or t.dir ~= nil then
+		return true
+	end
+	return #t <= 1 and not is_list(t)
 end
 
 --- @param raw table|string
@@ -116,7 +141,7 @@ local function dep_list(deps)
 	if deps == nil then
 		return {}
 	end
-	if type(deps) == 'string' then
+	if type(deps) == 'string' or is_spec(deps) then
 		return { deps }
 	end
 	return deps

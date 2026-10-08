@@ -82,7 +82,7 @@ happened to you.
 | `[1]` / `src` | Plugin source. A bare `owner/repo` becomes `https://github.com/owner/repo`. A scheme or scp-like source is passed to git as written. A bare host gets `https://` prepended, since git would otherwise read it as a local path. | `url` is not a separate field |
 | `dir` | Local plugin. Tilde-expanded. Never touches `vim.pack` or the lockfile. | same |
 | `name` | Directory name, display name, and the basis for module derivation. | same |
-| `dependencies` | Load-order edges. A bare string references another spec; a table is a spec. | nothing is lazy-loaded, so these only order things |
+| `dependencies` | Load-order edges. A string, a lone spec, or a list of either. A bare string references another spec; a table is a spec. | nothing is lazy-loaded, so these only order things |
 | `opts` | A table merges across duplicate specs and is passed to `require(main).setup(opts)`. A function is called as `opts(merged_opts)` and replaces the setup call entirely, taking full responsibility for the plugin. Return value ignored. | absorbs lazy's `config`, which does not exist here |
 | `post` | Runs after the plugin's setup. | replaces lazy's `init`, which ran *before* load |
 | `build` | Lua function, run on install and update. | no shell strings, string lists, or `:Cmd` |
@@ -97,6 +97,34 @@ Every other lazy field (`lazy`, `event`, `ft`, `cmd`, `init`, `config`, `main`,
 `opts_extend`) is ignored without comment.
 
 A plugin with no `opts` and no `post` never gets a `setup()` call.
+
+### Lists and lone specs
+
+Wherever a list of specs can go, a table carrying spec fields of its own counts
+as one spec instead. `{ 'owner/repo', opts = {} }` is a single plugin.
+`{ 'owner/repo', 'other/repo' }` is two. The rule is lazy's `Util.is_list`. A
+table is a list when every one of its keys is a list index, or when it holds
+more than one list entry. Otherwise it is a spec.
+
+So a lone dependency needs no braces around it.
+
+```lua
+{
+	dir = '~/projects/oil-xdg-filechooser',
+	name = 'oil-filechooser',
+	dependencies = {
+		'barrettruth/canola.nvim',
+		opts = function()
+			require('oil').setup(oil_opts)
+		end,
+	},
+}
+```
+
+Drop the `opts` and that same table becomes a one-element list, where the bare
+string is a reference: it adds a load-order edge and nothing else. `src` and
+`dir` settle it on their own, so `{ dir = '~/x' }` is a spec even though it has
+no list entry at all.
 
 ### Imports
 

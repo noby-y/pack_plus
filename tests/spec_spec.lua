@@ -136,6 +136,41 @@ local nested = spec.collect({
 check('child lifted', nested.by_name['child'].opts, { c = 1 })
 check('child before parent', resolve.sort(nested)[1].name, 'child')
 
+-- A lone dependency needs no braces around it: a `dependencies` table carrying
+-- spec fields of its own is the spec, not a list holding one.
+local bare_dep = spec.collect({
+	{
+		'a/parent',
+		dependencies = {
+			'a/child',
+			opts = { c = 1 },
+		},
+	},
+})
+check('unbraced lone dependency keeps opts', bare_dep.by_name['child'].opts, { c = 1 })
+check('unbraced lone dependency still makes an edge', bare_dep.by_name['parent'].deps, { 'child' })
+check('unbraced lone dependency is not implicit', bare_dep.by_name['child'].implicit, false)
+
+local bare_dep_fn = spec.collect({
+	{ 'a/parent', dependencies = { 'a/child', opts = function() end } },
+})
+check('unbraced lone dependency keeps a function opts', type(bare_dep_fn.by_name['child'].opts_fn), 'function')
+
+-- Still a list when it looks like one.
+local listed = spec.collect({ { 'a/parent', dependencies = { 'a/one', 'a/two' } } })
+check('plain list of references', listed.by_name['parent'].deps, { 'one', 'two' })
+check('two references collected', #listed.order, 3)
+
+local single = spec.collect({ { 'a/parent', dependencies = { 'a/child' } } })
+check('single-element list is still a reference', single.by_name['child'].implicit, true)
+check('string dependency', spec.collect({ { 'a/parent', dependencies = 'a/child' } }).by_name['child'].implicit, true)
+
+-- The same rule at the top level, where a multi-entry list was previously read
+-- as one spec keyed on its first entry.
+check('top-level list of bare strings', #spec.collect({ 'a/one', 'a/two' }).order, 2)
+check('top-level lone spec needs no braces', spec.collect({ 'a/one', opts = { x = 1 } }).by_name['one'].opts, { x = 1 })
+check('empty table collects nothing', #spec.collect({}).order, 0)
+
 -- Import ---------------------------------------------------------------------
 
 -- Narrowed to the fixture, or a real `~/.config/nvim/lua/plugins` on the
